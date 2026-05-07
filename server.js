@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -6,12 +7,11 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'data', 'contacts.json');
 
-// ─── DB helpers ───────────────────────────────────────────
 function readDB() {
   try {
     if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify([]));
     return JSON.parse(fs.readFileSync(DB_PATH, 'utf8'));
-  } catch { return []; }
+  } catch (e) { return []; }
 }
 
 function writeDB(data) {
@@ -22,24 +22,30 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-// ─── ROUTER ───────────────────────────────────────────────
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+function sha256(str) {
+  return str ? crypto.createHash('sha256').update(str.trim().toLowerCase()).digest('hex') : null;
+}
+
+function jsonRes(res, data, status) {
+  res.writeHead(status || 200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+const server = http.createServer(function(req, res) {
+  const url = new URL(req.url, 'http://localhost:' + PORT);
   const method = req.method;
 
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-calendly-webhook-signature');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // ── Static files (frontend) ──
   if (method === 'GET' && !url.pathname.startsWith('/api')) {
-    let filePath = url.pathname === '/' ? '/index.html' : url.pathname;
+    var filePath = url.pathname === '/' ? '/index.html' : url.pathname;
     filePath = path.join(__dirname, 'public', filePath);
-    const ext = path.extname(filePath);
-    const mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' };
+    var ext = path.extname(filePath);
+    var mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' };
     if (fs.existsSync(filePath)) {
       res.writeHead(200, { 'Content-Type': mime[ext] || 'text/plain' });
       res.end(fs.readFileSync(filePath));
@@ -49,257 +55,186 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ── Body parser ──
-  let body = '';
-  req.on('data', chunk => body += chunk);
-  req.on('end', () => {
-    try { body = body ? JSON.parse(body) : {}; } catch { body = {}; }
-    route(req, res, url, method, body);
+  var body = '';
+  req.on('data', function(chunk) { body += chunk; });
+  req.on('end', function() {
+    try { body = body ? JSON.parse(body) : {}; } catch (e) { body = {}; }
+    handleRoute(res, url, method, body);
   });
 });
 
-function route(req, res, url, method, body) {
-  const json = (data, status = 200) => {
-    res.writeHead(status, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(data));
-  };
+function handleRoute(res, url, method, body) {
 
-  // ── GET /api/contacts ──
   if (method === 'GET' && url.pathname === '/api/contacts') {
-    return json(readDB());
+    return jsonRes(res, readDB());
   }
 
-  // ── POST /api/contacts ── (manual add)
   if (method === 'POST' && url.pathname === '/api/contacts') {
-    const contacts = readDB();
-    const contact = {
-      id: uid(),
-      createdAt: new Date().toISOString(),
-      metaSent: {},
-      source: 'manual',
-      ...body
-    };
+    var contacts = readDB();
+    var contact = Object.assign({ id: uid(), createdAt: new Date().toISOString(), metaSent: {}, source: 'manual' }, body);
     contacts.unshift(contact);
     writeDB(contacts);
-    return json(contact, 201);
+    return jsonRes(res, contact, 201);
   }
 
-  // ── PATCH /api/contacts/:id ── (update status, notes, etc)
   if (method === 'PATCH' && url.pathname.startsWith('/api/contacts/')) {
-    const id = url.pathname.split('/')[3];
-    const contacts = readDB();
-    const idx = contacts.findIndex(c => c.id === id);
-    if (idx === -1) return json({ error: 'Not found' }, 404);
-    contacts[idx] = { ...contacts[idx], ...body };
+    var id = url.pathname.split('/')[3];
+    var contacts = readDB();
+    var idx = contacts.findIndex(function(c) { return c.id === id; });
+    if (idx === -1) return jsonRes(res, { error: 'Not found' }, 404);
+    contacts[idx] = Object.assign({}, contacts[idx], body);
     writeDB(contacts);
-    return json(contacts[idx]);
+    return jsonRes(res, contacts[idx]);
   }
 
-  // ── DELETE /api/contacts/:id ──
   if (method === 'DELETE' && url.pathname.startsWith('/api/contacts/')) {
-    const id = url.pathname.split('/')[3];
-    let contacts = readDB();
-    contacts = contacts.filter(c => c.id !== id);
+    var id = url.pathname.split('/')[3];
+    var contacts = readDB().filter(function(c) { return c.id !== id; });
     writeDB(contacts);
-    return json({ ok: true });
+    return jsonRes(res, { ok: true });
   }
 
-  // ── POST /api/webhook/calendly ── (Calendly webhook)
   if (method === 'POST' && url.pathname === '/api/webhook/calendly') {
-    const event = body.event || body.payload?.event_type?.name;
-    
-    // Only process new bookings
-    if (event !== 'invitee.created' && body.event !== 'invitee.created') {
-      return json({ ok: true, ignored: true });
-    }
+    var event = body.event;
+    if (event !== 'invitee.created') return jsonRes(res, { ok: true, ignored: true });
 
-    const payload = body.payload || body;
-    const invitee = payload.invitee || {};
-    const scheduled = payload.event || {};
+    var payload = body.payload || {};
+    var invitee = payload.invitee || {};
+    var scheduled = payload.event || {};
+    var qa = invitee.questions_and_answers || [];
+    var telefono = '';
+    var negocio = '';
 
-    // Extract phone from questions_and_answers if present
-    let telefono = '';
-    const qa = invitee.questions_and_answers || [];
-    const phoneQ = qa.find(q =>
-      q.question?.toLowerCase().includes('tel') ||
-      q.question?.toLowerCase().includes('whatsapp') ||
-      q.question?.toLowerCase().includes('phone')
-    );
-    if (phoneQ) telefono = phoneQ.answer || '';
+    qa.forEach(function(q) {
+      var ql = (q.question || '').toLowerCase();
+      if (ql.includes('tel') || ql.includes('whatsapp') || ql.includes('phone')) telefono = q.answer || '';
+      if (ql.includes('negocio') || ql.includes('empresa') || ql.includes('business')) negocio = q.answer || '';
+    });
 
-    // Extract negocio/empresa
-    let negocio = '';
-    const negQ = qa.find(q =>
-      q.question?.toLowerCase().includes('negocio') ||
-      q.question?.toLowerCase().includes('empresa') ||
-      q.question?.toLowerCase().includes('business')
-    );
-    if (negQ) negocio = negQ.answer || '';
-
-    const nameParts = (invitee.name || '').split(' ');
-    const nombre = nameParts[0] || '';
-    const apellido = nameParts.slice(1).join(' ') || '';
-
-    const contact = {
+    var nameParts = (invitee.name || '').split(' ');
+    var contact = {
       id: uid(),
       createdAt: new Date().toISOString(),
       metaSent: {},
       source: 'calendly',
-      nombre,
-      apellido,
+      nombre: nameParts[0] || '',
+      apellido: nameParts.slice(1).join(' ') || '',
       email: invitee.email || '',
-      telefono,
-      negocio,
-      fecha: scheduled.start_time || invitee.scheduled_event?.start_time || new Date().toISOString(),
+      telefono: telefono,
+      negocio: negocio,
+      fecha: scheduled.start_time || new Date().toISOString(),
       estado: 'agendado',
-      notas: '',
-      calendlyUri: invitee.uri || ''
+      notas: ''
     };
 
-    const contacts = readDB();
-    // Avoid duplicates by email + fecha
-    const exists = contacts.find(c => c.email === contact.email && c.fecha === contact.fecha);
-    if (exists) return json({ ok: true, duplicate: true });
+    var contacts = readDB();
+    var exists = contacts.find(function(c) { return c.email === contact.email && c.fecha === contact.fecha; });
+    if (exists) return jsonRes(res, { ok: true, duplicate: true });
 
     contacts.unshift(contact);
     writeDB(contacts);
-
-    console.log(`[Calendly] Nuevo agendamiento: ${contact.nombre} ${contact.apellido} <${contact.email}>`);
-    return json({ ok: true, contact });
+    console.log('[Calendly] Nuevo agendamiento: ' + contact.nombre + ' ' + contact.apellido);
+    return jsonRes(res, { ok: true, contact: contact });
   }
 
-  // ── POST /api/meta/send ── (send event to Meta CAPI)
-  if (method === 'POST' && url.pathname === '/api/meta/send') {
-    const { contactId, eventName, pixelId, accessToken } = body;
-    if (!pixelId || !accessToken || !contactId || !eventName) {
-      return json({ error: 'Faltan parámetros' }, 400);
-    }
-
-    const contacts = readDB();
-    const contact = contacts.find(c => c.id === contactId);
-    if (!contact) return json({ error: 'Contacto no encontrado' }, 404);
-
-    // Hash email and phone
-    function sha256(str) {
-      return str ? crypto.createHash('sha256').update(str.trim().toLowerCase()).digest('hex') : null;
-    }
-
-    const em = sha256(contact.email);
-    const ph = contact.telefono ? sha256(contact.telefono.replace(/\D/g, '')) : null;
-
-    const metaPayload = {
-      data: [{
-        event_name: eventName,
-        event_time: Math.floor(Date.now() / 1000),
-        action_source: 'crm',
-        user_data: {
-          ...(em && { em: [em] }),
-          ...(ph && { ph: [ph] }),
-        },
-        custom_data: {
-          crm_status: contact.estado,
-          negocio: contact.negocio || '',
-        }
-      }]
-    };
-
-    // Call Meta CAPI
-    const metaUrl = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
-
-    const https = require('https');
-    const metaBody = JSON.stringify(metaPayload);
-    const urlObj = new URL(metaUrl);
-
-    const options = {
-      hostname: urlObj.hostname,
-      path: urlObj.pathname + urlObj.search,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(metaBody) }
-    };
-
-    const metaReq = https.request(options, metaRes => {
-      let data = '';
-      metaRes.on('data', chunk => data += chunk);
-      metaRes.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.events_received > 0 || parsed.fbtrace_id) {
-            const idx = contacts.findIndex(c => c.id === contactId);
-            if (!contacts[idx].metaSent) contacts[idx].metaSent = {};
-            contacts[idx].metaSent[eventName] = new Date().toISOString();
-            writeDB(contacts);
-            json({ ok: true, meta: parsed });
-          } else {
-            json({ error: parsed?.error?.message || 'Meta error', raw: parsed }, 400);
-          }
-        } catch(e) { json({ error: e.message }, 500); }
-      });
-    });
-    metaReq.on('error', err => json({ error: err.message }, 500));
-    metaReq.write(metaBody);
-    metaReq.end();
-
-    return; // async
-  }
-
-  // ── POST /api/simulate/calendly ── (simulate a Calendly booking for demo)
   if (method === 'POST' && url.pathname === '/api/simulate/calendly') {
-    const names = ['Lucía Fernández', 'Diego Martínez', 'Valentina López', 'Mateo García', 'Camila Rodríguez'];
-    const businesses = ['E-commerce ropa', 'Agencia diseño', 'Consultoría RRHH', 'Startup tech', 'Tienda física'];
-    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-    const name = pick(names).split(' ');
+    var names = ['Lucia Fernandez', 'Diego Martinez', 'Valentina Lopez', 'Mateo Garcia', 'Camila Rodriguez'];
+    var businesses = ['E-commerce ropa', 'Agencia diseno', 'Consultoria RRHH', 'Startup tech', 'Tienda fisica'];
+    var pick = function(arr) { return arr[Math.floor(Math.random() * arr.length)]; };
+    var fullName = pick(names);
+    var nameParts = fullName.split(' ');
 
-    const fakePayload = {
-      event: 'invitee.created',
-      payload: {
-        invitee: {
-          name: pick(names),
-          email: `demo${Date.now()}@ejemplo.com`,
-          questions_and_answers: [
-            { question: 'WhatsApp', answer: '+54 11 ' + Math.floor(Math.random()*90000000+10000000) },
-            { question: '¿A qué se dedica tu negocio?', answer: pick(businesses) }
-          ]
-        },
-        event: {
-          start_time: new Date(Date.now() + 86400000 * Math.floor(Math.random()*5+1)).toISOString()
-        }
-      }
-    };
-
-    // Reuse webhook logic
-    const invitee = fakePayload.payload.invitee;
-    const scheduled = fakePayload.payload.event;
-    const qa = invitee.questions_and_answers || [];
-    const phoneQ = qa.find(q => q.question?.toLowerCase().includes('whatsapp'));
-    const negQ = qa.find(q => q.question?.toLowerCase().includes('negocio'));
-    const nameParts = invitee.name.split(' ');
-
-    const contact = {
+    var contact = {
       id: uid(),
       createdAt: new Date().toISOString(),
       metaSent: {},
       source: 'calendly-simulado',
       nombre: nameParts[0],
       apellido: nameParts.slice(1).join(' '),
-      email: invitee.email,
-      telefono: phoneQ?.answer || '',
-      negocio: negQ?.answer || '',
-      fecha: scheduled.start_time,
+      email: 'demo' + Date.now() + '@ejemplo.com',
+      telefono: '+54 11 ' + Math.floor(Math.random() * 90000000 + 10000000),
+      negocio: pick(businesses),
+      fecha: new Date(Date.now() + 86400000 * Math.floor(Math.random() * 5 + 1)).toISOString(),
       estado: 'agendado',
-      notas: '⚡ Contacto simulado para demo'
+      notas: 'Contacto simulado para demo'
     };
 
-    const contacts = readDB();
+    var contacts = readDB();
     contacts.unshift(contact);
     writeDB(contacts);
-
-    console.log(`[Simulación] Nuevo contacto: ${contact.nombre} ${contact.apellido}`);
-    return json({ ok: true, contact });
+    console.log('[Simulacion] Nuevo contacto: ' + contact.nombre);
+    return jsonRes(res, { ok: true, contact: contact });
   }
 
-  json({ error: 'Not found' }, 404);
-});
+  if (method === 'POST' && url.pathname === '/api/meta/send') {
+    var contactId = body.contactId;
+    var eventName = body.eventName;
+    var pixelId = body.pixelId;
+    var accessToken = body.accessToken;
 
-server.listen(PORT, () => {
-  console.log(`CRM Martín corriendo en http://localhost:${PORT}`);
+    if (!pixelId || !accessToken || !contactId || !eventName) {
+      return jsonRes(res, { error: 'Faltan parametros' }, 400);
+    }
+
+    var contacts = readDB();
+    var contact = contacts.find(function(c) { return c.id === contactId; });
+    if (!contact) return jsonRes(res, { error: 'Contacto no encontrado' }, 404);
+
+    var em = sha256(contact.email);
+    var ph = contact.telefono ? sha256(contact.telefono.replace(/\D/g, '')) : null;
+
+    var userData = {};
+    if (em) userData.em = [em];
+    if (ph) userData.ph = [ph];
+
+    var metaPayload = JSON.stringify({
+      data: [{
+        event_name: eventName,
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: 'crm',
+        user_data: userData,
+        custom_data: { crm_status: contact.estado, negocio: contact.negocio || '' }
+      }]
+    });
+
+    var metaPath = '/v19.0/' + pixelId + '/events?access_token=' + accessToken;
+    var options = {
+      hostname: 'graph.facebook.com',
+      path: metaPath,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(metaPayload) }
+    };
+
+    var metaReq = https.request(options, function(metaRes) {
+      var data = '';
+      metaRes.on('data', function(chunk) { data += chunk; });
+      metaRes.on('end', function() {
+        try {
+          var parsed = JSON.parse(data);
+          if (parsed.events_received > 0 || parsed.fbtrace_id) {
+            var idx = contacts.findIndex(function(c) { return c.id === contactId; });
+            if (!contacts[idx].metaSent) contacts[idx].metaSent = {};
+            contacts[idx].metaSent[eventName] = new Date().toISOString();
+            writeDB(contacts);
+            jsonRes(res, { ok: true, meta: parsed });
+          } else {
+            jsonRes(res, { error: (parsed.error && parsed.error.message) || 'Meta error' }, 400);
+          }
+        } catch (e) {
+          jsonRes(res, { error: e.message }, 500);
+        }
+      });
+    });
+
+    metaReq.on('error', function(err) { jsonRes(res, { error: err.message }, 500); });
+    metaReq.write(metaPayload);
+    metaReq.end();
+    return;
+  }
+
+  jsonRes(res, { error: 'Not found' }, 404);
+}
+
+server.listen(PORT, function() {
+  console.log('CRM Martin corriendo en http://localhost:' + PORT);
 });
