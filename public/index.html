@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM — Martín Vieira Taroco</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --accent: #c8f135;
+    --accent-dim: rgba(200,241,53,0.12);
+    --accent-dim2: rgba(200,241,53,0.06);
+    --text: #f0f0f0;
+    --muted: #666;
+    --muted2: #444;
+    --red: #ff4545;
+    --red-dim: rgba(255,69,69,0.12);
+    --blue: #4fa3ff;
+    --blue-dim: rgba(79,163,255,0.12);
+    --orange: #ffaa33;
+    --orange-dim: rgba(255,170,51,0.12);
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px); z-index: 100;
+  }
+  .logo { font-size: 15px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  .logo span { color: var(--muted); font-weight: 400; }
+  .topbar-stats { display: flex; gap: 28px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+  .topbar-stats b { color: var(--text); font-size: 14px; }
+
+  /* MAIN */
+  .main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+
+  /* META CONFIG */
+  .meta-config {
+    background: var(--surface); border: 1px solid var(--border);
+    border-left: 3px solid var(--blue); border-radius: var(--radius);
+    padding: 16px 20px; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .meta-config-label { font-size: 11px; color: var(--blue); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+  .meta-config input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px;
+    padding: 8px 12px; flex: 1; min-width: 160px; outline: none; transition: border-color 0.2s;
+  }
+  .meta-config input:focus { border-color: var(--blue); }
+  .meta-config input::placeholder { color: var(--muted2); }
+  .meta-status { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .meta-status.ok { color: var(--accent); }
+
+  /* SIMULATE BANNER */
+  .simulate-banner {
+    background: var(--accent-dim2); border: 1px dashed rgba(200,241,53,0.25);
+    border-radius: var(--radius); padding: 12px 20px; margin-bottom: 28px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .simulate-label { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  .simulate-desc { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; flex: 1; }
+
+  /* ACTIONS */
+  .actions-bar { display: flex; gap: 12px; margin-bottom: 28px; flex-wrap: wrap; align-items: center; }
+  .btn {
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px;
+    letter-spacing: 0.08em; text-transform: uppercase; border: none;
+    border-radius: 6px; padding: 10px 18px; cursor: pointer;
+    transition: all 0.15s; display: flex; align-items: center; gap: 8px;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #d8ff45; transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+  .btn-simulate { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(200,241,53,0.25); }
+  .btn-simulate:hover { background: rgba(200,241,53,0.2); }
+  .search-input {
+    margin-left: auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 12px; padding: 10px 14px; width: 220px; outline: none; transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--muted); }
+  .search-input::placeholder { color: var(--muted2); }
+
+  /* FILTER TABS */
+  .filter-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab {
+    font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    background: none; border: none; cursor: pointer; padding: 10px 16px;
+    border-bottom: 2px solid transparent; transition: all 0.15s; position: relative; top: 1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab .count { background: var(--surface2); color: var(--muted); font-size: 10px; padding: 2px 6px; border-radius: 20px; margin-left: 6px; }
+  .tab.active .count { background: var(--accent-dim); color: var(--accent); }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    padding: 12px 16px; text-align: left; font-family: 'DM Mono', monospace;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--border); background: var(--surface); white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 14px 16px; vertical-align: middle; }
+  .name-cell { font-weight: 700; font-size: 14px; color: var(--text); }
+  .name-cell .email { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  .source-badge { font-size: 9px; font-family: 'DM Mono', monospace; padding: 2px 6px; border-radius: 10px; margin-top: 3px; display: inline-block; }
+  .source-calendly { background: var(--blue-dim); color: var(--blue); }
+  .source-simulado { background: var(--accent-dim); color: var(--accent); }
+  .source-manual { background: var(--surface2); color: var(--muted); }
+  .mono { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* STATUS SELECT */
+  .status-select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 12px;
+    padding: 6px 10px; cursor: pointer; outline: none;
+  }
+
+  /* META BADGE */
+  .meta-badge { font-family: 'DM Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 20px; display: inline-block; margin-bottom: 3px; }
+  .meta-sent { background: var(--accent-dim2); color: var(--accent); border: 1px solid rgba(200,241,53,0.2); }
+  .meta-none { background: transparent; color: var(--muted2); border: 1px dashed var(--muted2); }
+
+  /* ROW ACTIONS */
+  .row-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .row-btn {
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500;
+    padding: 5px 10px; border-radius: 5px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  }
+  .row-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--muted); }
+  .row-btn.delete:hover { border-color: var(--red); color: var(--red); }
+  .row-btn.meta:hover { border-color: var(--blue); color: var(--blue); }
+  .row-btn.ql:hover { border-color: var(--accent); color: var(--accent); }
+  .notes-text { font-size: 12px; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(4px); padding: 20px; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 480px; padding: 28px; position: relative; }
+  .modal h2 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+  .modal .subtitle { font-size: 12px; color: var(--muted); margin-bottom: 24px; font-family: 'DM Mono', monospace; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px; padding: 10px 14px; outline: none; transition: border-color 0.2s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group select { appearance: none; cursor: pointer; }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+  .close-btn { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px; }
+  .close-btn:hover { color: var(--text); }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
+  .toast { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; animation: slideIn 0.2s ease; max-width: 320px; }
+  .toast.success { border-left: 3px solid var(--accent); }
+  .toast.error { border-left: 3px solid var(--red); }
+  .toast.info { border-left: 3px solid var(--blue); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  /* EMPTY */
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .empty-state .big { font-size: 48px; margin-bottom: 16px; }
+  .empty-state h3 { font-size: 18px; color: var(--text); margin-bottom: 8px; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 60px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  .hidden { display: none !important; }
+
+  @media (max-width: 768px) {
+    .topbar { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+    .topbar-stats { gap: 16px; }
+    .main { padding: 20px 12px; }
+    .search-input { width: 100%; margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">CRM <span>/ Martín Vieira Taroco</span></div>
+  <div class="topbar-stats">
+    <div>Agendados <b id="stat-total">—</b></div>
+    <div>Asistieron <b id="stat-asistio">—</b></div>
+    <div>Calificados <b id="stat-calificado">—</b></div>
+    <div>Conv. <b id="stat-conv">—</b></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- META CONFIG -->
+  <div class="meta-config">
+    <div class="meta-config-label">🔵 Meta CAPI</div>
+    <input type="text" id="meta-pixel-id" placeholder="Pixel ID">
+    <input type="password" id="meta-access-token" placeholder="Access Token">
+    <button class="btn btn-ghost" style="padding:8px 14px;font-size:11px" onclick="saveMetaConfig()">Guardar</button>
+    <div class="meta-status" id="meta-status">⚠ Configura Pixel ID y Token</div>
+  </div>
+
+  <!-- SIMULATE BANNER -->
+  <div class="simulate-banner">
+    <div class="simulate-label">⚡ Demo</div>
+    <div class="simulate-desc">Simulá un agendamiento de Calendly para ver el flujo completo</div>
+    <button class="btn btn-simulate" onclick="simulateCalendly()">Simular agendamiento</button>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions-bar">
+    <button class="btn btn-primary" onclick="openAddModal()">+ Agregar contacto</button>
+    <button class="btn btn-ghost" onclick="exportCSV()">↓ Exportar CSV</button>
+    <button class="btn btn-ghost" onclick="loadContacts()">↻ Actualizar</button>
+    <input type="text" class="search-input" id="search" placeholder="Buscar nombre, email..." oninput="renderTable()">
+  </div>
+
+  <!-- FILTER TABS -->
+  <div class="filter-tabs">
+    <button class="tab active" onclick="setFilter('todos', this)">Todos <span class="count" id="cnt-todos">0</span></button>
+    <button class="tab" onclick="setFilter('agendado', this)">Agendados <span class="count" id="cnt-agendado">0</span></button>
+    <button class="tab" onclick="setFilter('asistio', this)">Asistieron <span class="count" id="cnt-asistio">0</span></button>
+    <button class="tab" onclick="setFilter('calificado', this)">Calificados <span class="count" id="cnt-calificado">0</span></button>
+    <button class="tab" onclick="setFilter('no-calificado', this)">No calificados <span class="count" id="cnt-no-calificado">0</span></button>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <div class="loading" id="loading">Cargando contactos...</div>
+    <table id="main-table" class="hidden">
+      <thead>
+        <tr>
+          <th>Contacto</th>
+          <th>Fecha call</th>
+          <th>Negocio</th>
+          <th>Estado</th>
+          <th>Meta CAPI</th>
+          <th>Notas</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
+    <div id="empty-state" class="empty-state hidden">
+      <div class="big">📋</div>
+      <h3>Sin contactos todavía</h3>
+      <p>Usá el botón "Simular agendamiento" para ver el flujo en acción.</p>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AGREGAR / EDITAR -->
+<div class="modal-overlay hidden" id="modal-contact">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal('modal-contact')">×</button>
+    <h2 id="modal-title">Nuevo contacto</h2>
+    <div class="subtitle" id="modal-subtitle">Ingresá los datos manualmente</div>
+    <div class="form-row">
+      <div class="form-group"><label>Nombre</label><input type="text" id="f-nombre" placeholder="Juan"></div>
+      <div class="form-group"><label>Apellido</label><input type="text" id="f-apellido" placeholder="García"></div>
+    </div>
+    <div class="form-group"><label>Email</label><input type="email" id="f-email" placeholder="juan@empresa.com"></div>
+    <div class="form-row">
+      <div class="form-group"><label>WhatsApp</label><input type="text" id="f-telefono" placeholder="+54 11..."></div>
+      <div class="form-group"><label>Fecha de la call</label><input type="datetime-local" id="f-fecha"></div>
+    </div>
+    <div class="form-group"><label>Negocio / Rubro</label><input type="text" id="f-negocio" placeholder="E-commerce, servicios..."></div>
+    <div class="form-group">
+      <label>Estado</label>
+      <select id="f-estado">
+        <option value="agendado">Agendado</option>
+        <option value="asistio">Asistió a la call</option>
+        <option value="calificado">Calificado ✓</option>
+        <option value="no-calificado">No calificado ✗</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="f-notas" placeholder="Contexto, objeciones, próximos pasos..."></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-contact')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveContact()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOTAS -->
+<div class="modal-overlay hidden" id="modal-notas">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal('modal-notas')">×</button>
+    <h2>Notas</h2>
+    <div class="subtitle" id="notas-nombre">—</div>
+    <div class="form-group" style="margin-top:8px">
+      <textarea id="notas-textarea" style="min-height:140px" placeholder="Notas sobre este contacto..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-notas')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveNotas()">Guardar notas</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────
+let contacts = [];
+let metaConfig = JSON.parse(localStorage.getItem('crm_meta') || '{}');
+let currentFilter = 'todos';
+let editingId = null;
+let notasId = null;
+const API = ''; // same origin
+
+// ─── INIT ─────────────────────────────────────────────────
+async function init() {
+  if (metaConfig.pixelId) document.getElementById('meta-pixel-id').value = metaConfig.pixelId;
+  updateMetaStatus();
+  await loadContacts();
+}
+
+// ─── API ──────────────────────────────────────────────────
+async function api(path, method = 'GET', body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  return res.json();
+}
+
+async function loadContacts() {
+  try {
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('main-table').classList.add('hidden');
+    contacts = await api('/api/contacts');
+    renderTable();
+  } catch(e) {
+    toast('Error conectando al servidor', 'error');
+  } finally {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('main-table').classList.remove('hidden');
+  }
+}
+
+// ─── SIMULATE CALENDLY ────────────────────────────────────
+async function simulateCalendly() {
+  try {
+    const res = await api('/api/simulate/calendly', 'POST');
+    if (res.ok) {
+      contacts.unshift(res.contact);
+      renderTable();
+      toast(`⚡ Simulación: ${res.contact.nombre} ${res.contact.apellido} agendó una call`, 'success');
+    }
+  } catch(e) {
+    toast('Error simulando agendamiento', 'error');
+  }
+}
+
+// ─── META CONFIG ──────────────────────────────────────────
+function saveMetaConfig() {
+  const pixelId = document.getElementById('meta-pixel-id').value.trim();
+  const token = document.getElementById('meta-access-token').value.trim();
+  if (!pixelId || !token) { toast('Completá Pixel ID y Token', 'error'); return; }
+  metaConfig = { pixelId, token };
+  localStorage.setItem('crm_meta', JSON.stringify(metaConfig));
+  document.getElementById('meta-access-token').value = '';
+  document.getElementById('meta-access-token').placeholder = '••• guardado';
+  updateMetaStatus();
+  toast('Configuración de Meta guardada ✓', 'success');
+}
+
+function updateMetaStatus() {
+  const el = document.getElementById('meta-status');
+  if (metaConfig.pixelId && metaConfig.token) {
+    el.textContent = `✓ Pixel ${metaConfig.pixelId.slice(0,6)}... conectado`;
+    el.className = 'meta-status ok';
+  } else {
+    el.textContent = '⚠ Configura Pixel ID y Token';
+    el.className = 'meta-status';
+  }
+}
+
+// ─── SEND META CAPI ───────────────────────────────────────
+async function sendMetaCAPI(contactId, eventName) {
+  if (!metaConfig.pixelId || !metaConfig.token) {
+    toast('Configurá Meta CAPI primero', 'error'); return;
+  }
+  try {
+    const res = await api('/api/meta/send', 'POST', {
+      contactId, eventName,
+      pixelId: metaConfig.pixelId,
+      accessToken: metaConfig.token
+    });
+    if (res.ok) {
+      const idx = contacts.findIndex(c => c.id === contactId);
+      if (!contacts[idx].metaSent) contacts[idx].metaSent = {};
+      contacts[idx].metaSent[eventName] = new Date().toISOString();
+      renderTable();
+      toast(`✓ Evento "${eventName}" enviado a Meta CAPI`, 'success');
+    } else {
+      toast(`Error Meta: ${res.error}`, 'error');
+    }
+  } catch(e) {
+    toast('Error enviando a Meta', 'error');
+  }
+}
+
+// ─── STATUS CHANGE ────────────────────────────────────────
+async function changeStatus(id, newStatus) {
+  const idx = contacts.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  contacts[idx].estado = newStatus;
+  renderTable();
+  await api(`/api/contacts/${id}`, 'PATCH', { estado: newStatus });
+
+  if (newStatus === 'calificado' && metaConfig.token) {
+    toast('✓ Calificado. Recordá enviar QualifiedLead a Meta →', 'info');
+  }
+}
+
+// ─── FILTER ───────────────────────────────────────────────
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderTable() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const filtered = contacts.filter(c => {
+    const matchFilter = currentFilter === 'todos' || c.estado === currentFilter;
+    const matchSearch = !search ||
+      (c.nombre + ' ' + c.apellido).toLowerCase().includes(search) ||
+      (c.email || '').toLowerCase().includes(search) ||
+      (c.negocio || '').toLowerCase().includes(search);
+    return matchFilter && matchSearch;
+  });
+
+  // counts
+  document.getElementById('cnt-todos').textContent = contacts.length;
+  ['agendado','asistio','calificado','no-calificado'].forEach(s => {
+    document.getElementById('cnt-' + s).textContent = contacts.filter(c => c.estado === s).length;
+  });
+
+  // stats
+  document.getElementById('stat-total').textContent = contacts.length;
+  const asistio = contacts.filter(c => ['asistio','calificado','no-calificado'].includes(c.estado)).length;
+  const calificado = contacts.filter(c => c.estado === 'calificado').length;
+  document.getElementById('stat-asistio').textContent = asistio;
+  document.getElementById('stat-calificado').textContent = calificado;
+  document.getElementById('stat-conv').textContent = asistio > 0 ? Math.round(calificado / asistio * 100) + '%' : '—';
+
+  const tbody = document.getElementById('table-body');
+  const empty = document.getElementById('empty-state');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+  } else {
+    empty.classList.add('hidden');
+    tbody.innerHTML = filtered.map(renderRow).join('');
+  }
+}
+
+function renderRow(c) {
+  const metaLeadSent = c.metaSent?.Lead;
+  const metaQLSent = c.metaSent?.QualifiedLead;
+  const sourceClass = c.source?.includes('simulado') ? 'source-simulado' : c.source === 'calendly' ? 'source-calendly' : 'source-manual';
+  const sourceLabel = c.source?.includes('simulado') ? '⚡ simulado' : c.source === 'calendly' ? '📅 calendly' : '✍ manual';
+
+  return `<tr>
+    <td>
+      <div class="name-cell">${esc(c.nombre)} ${esc(c.apellido||'')}</div>
+      <div class="email">${esc(c.email||'—')}</div>
+      ${c.telefono ? `<div class="email">${esc(c.telefono)}</div>` : ''}
+      <span class="source-badge ${sourceClass}">${sourceLabel}</span>
+    </td>
+    <td class="mono">${c.fecha ? fmtDate(c.fecha) : '—'}</td>
+    <td class="mono">${esc(c.negocio||'—')}</td>
+    <td>
+      <select class="status-select" onchange="changeStatus('${c.id}', this.value)">
+        <option value="agendado" ${c.estado==='agendado'?'selected':''}>📅 Agendado</option>
+        <option value="asistio" ${c.estado==='asistio'?'selected':''}>📞 Asistió</option>
+        <option value="calificado" ${c.estado==='calificado'?'selected':''}>⭐ Calificado</option>
+        <option value="no-calificado" ${c.estado==='no-calificado'?'selected':''}>✗ No calificado</option>
+      </select>
+    </td>
+    <td>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span class="meta-badge ${metaLeadSent ? 'meta-sent' : 'meta-none'}">${metaLeadSent ? '✓' : '—'} Lead</span>
+        <span class="meta-badge ${metaQLSent ? 'meta-sent' : 'meta-none'}">${metaQLSent ? '✓' : '—'} Qualified</span>
+      </div>
+    </td>
+    <td><div class="notes-text">${esc(c.notas||'')}</div></td>
+    <td>
+      <div class="row-actions">
+        <button class="row-btn" onclick="openNotasModal('${c.id}')">📝</button>
+        <button class="row-btn" onclick="openEditModal('${c.id}')">Editar</button>
+        <button class="row-btn meta" onclick="sendMetaCAPI('${c.id}', 'Lead')">Lead→Meta</button>
+        ${c.estado === 'calificado' ? `<button class="row-btn ql" onclick="sendMetaCAPI('${c.id}', 'QualifiedLead')">QL→Meta ⭐</button>` : ''}
+        <button class="row-btn delete" onclick="deleteContact('${c.id}')">×</button>
+      </div>
+    </td>
+  </tr>`;
+}
+
+// ─── CRUD ─────────────────────────────────────────────────
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modal-title').textContent = 'Nuevo contacto';
+  document.getElementById('modal-subtitle').textContent = 'Ingresá los datos manualmente';
+  clearForm();
+  document.getElementById('modal-contact').classList.remove('hidden');
+}
+
+function openEditModal(id) {
+  editingId = id;
+  const c = contacts.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('modal-title').textContent = 'Editar contacto';
+  document.getElementById('modal-subtitle').textContent = c.email || c.nombre;
+  document.getElementById('f-nombre').value = c.nombre || '';
+  document.getElementById('f-apellido').value = c.apellido || '';
+  document.getElementById('f-email').value = c.email || '';
+  document.getElementById('f-telefono').value = c.telefono || '';
+  document.getElementById('f-fecha').value = c.fecha ? c.fecha.slice(0,16) : '';
+  document.getElementById('f-negocio').value = c.negocio || '';
+  document.getElementById('f-estado').value = c.estado || 'agendado';
+  document.getElementById('f-notas').value = c.notas || '';
+  document.getElementById('modal-contact').classList.remove('hidden');
+}
+
+function clearForm() {
+  ['f-nombre','f-apellido','f-email','f-telefono','f-fecha','f-negocio','f-notas'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-estado').value = 'agendado';
+}
+
+async function saveContact() {
+  const nombre = document.getElementById('f-nombre').value.trim();
+  if (!nombre) { toast('El nombre es obligatorio', 'error'); return; }
+  const data = {
+    nombre, apellido: document.getElementById('f-apellido').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    telefono: document.getElementById('f-telefono').value.trim(),
+    fecha: document.getElementById('f-fecha').value,
+    negocio: document.getElementById('f-negocio').value.trim(),
+    estado: document.getElementById('f-estado').value,
+    notas: document.getElementById('f-notas').value.trim(),
+  };
+  if (editingId) {
+    await api(`/api/contacts/${editingId}`, 'PATCH', data);
+    const idx = contacts.findIndex(c => c.id === editingId);
+    contacts[idx] = { ...contacts[idx], ...data };
+    toast('Contacto actualizado ✓', 'success');
+  } else {
+    const res = await api('/api/contacts', 'POST', { ...data, source: 'manual' });
+    contacts.unshift(res);
+    toast('Contacto agregado ✓', 'success');
+  }
+  renderTable();
+  closeModal('modal-contact');
+}
+
+async function deleteContact(id) {
+  if (!confirm('¿Eliminar este contacto?')) return;
+  await api(`/api/contacts/${id}`, 'DELETE');
+  contacts = contacts.filter(c => c.id !== id);
+  renderTable();
+  toast('Contacto eliminado', 'info');
+}
+
+function openNotasModal(id) {
+  notasId = id;
+  const c = contacts.find(x => x.id === id);
+  document.getElementById('notas-nombre').textContent = `${c.nombre} ${c.apellido||''} — ${c.email||''}`;
+  document.getElementById('notas-textarea').value = c.notas || '';
+  document.getElementById('modal-notas').classList.remove('hidden');
+}
+
+async function saveNotas() {
+  const notas = document.getElementById('notas-textarea').value.trim();
+  await api(`/api/contacts/${notasId}`, 'PATCH', { notas });
+  const idx = contacts.findIndex(c => c.id === notasId);
+  contacts[idx].notas = notas;
+  renderTable();
+  closeModal('modal-notas');
+  toast('Notas guardadas ✓', 'success');
+}
+
+// ─── EXPORT CSV ───────────────────────────────────────────
+function exportCSV() {
+  const headers = ['nombre','apellido','email','telefono','fecha','negocio','estado','notas','source','metaLead','metaQualified'];
+  const rows = contacts.map(c => [
+    c.nombre, c.apellido, c.email, c.telefono, c.fecha, c.negocio, c.estado, c.notas, c.source,
+    c.metaSent?.Lead||'', c.metaSent?.QualifiedLead||''
+  ].map(v => `"${(v||'').replace(/"/g,'""')}"`).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `crm_martin_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('CSV exportado ✓', 'success');
+}
+
+// ─── UTILS ────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtDate(str) {
+  try { return new Date(str).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+  catch { return str; }
+}
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${{success:'✓',error:'✗',info:'ℹ'}[type]}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.add('hidden'); }));
+
+init();
+</script>
+</body>
+</html>
