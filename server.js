@@ -187,7 +187,8 @@ function handleRoute(res, url, method, body) {
     if (em) userData.em = [em];
     if (ph) userData.ph = [ph];
 
-    var metaPayload = JSON.stringify({
+    var testCode = body.testCode || '';
+    var metaPayloadObj = {
       data: [{
         event_name: eventName,
         event_time: Math.floor(Date.now() / 1000),
@@ -195,7 +196,9 @@ function handleRoute(res, url, method, body) {
         user_data: userData,
         custom_data: { crm_status: contact.estado, negocio: contact.negocio || '' }
       }]
-    });
+    };
+    if (testCode) metaPayloadObj.test_event_code = testCode;
+    var metaPayload = JSON.stringify(metaPayloadObj);
 
     var metaPath = '/v19.0/' + pixelId + '/events?access_token=' + accessToken;
     var options = {
