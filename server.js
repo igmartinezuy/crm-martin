@@ -205,26 +205,39 @@ function route(req, res, url, method, body) {
 
     // Call Meta CAPI
     const metaUrl = `https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${accessToken}`;
-    
-    fetch(metaUrl, {
+
+    const https = require('https');
+    const metaBody = JSON.stringify(metaPayload);
+    const urlObj = new URL(metaUrl);
+
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname + urlObj.search,
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(metaPayload)
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data.events_received > 0 || data.fbtrace_id) {
-        // Update contact metaSent
-        const idx = contacts.findIndex(c => c.id === contactId);
-        if (!contacts[idx].metaSent) contacts[idx].metaSent = {};
-        contacts[idx].metaSent[eventName] = new Date().toISOString();
-        writeDB(contacts);
-        json({ ok: true, meta: data });
-      } else {
-        json({ error: data?.error?.message || 'Meta error', raw: data }, 400);
-      }
-    })
-    .catch(err => json({ error: err.message }, 500));
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(metaBody) }
+    };
+
+    const metaReq = https.request(options, metaRes => {
+      let data = '';
+      metaRes.on('data', chunk => data += chunk);
+      metaRes.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.events_received > 0 || parsed.fbtrace_id) {
+            const idx = contacts.findIndex(c => c.id === contactId);
+            if (!contacts[idx].metaSent) contacts[idx].metaSent = {};
+            contacts[idx].metaSent[eventName] = new Date().toISOString();
+            writeDB(contacts);
+            json({ ok: true, meta: parsed });
+          } else {
+            json({ error: parsed?.error?.message || 'Meta error', raw: parsed }, 400);
+          }
+        } catch(e) { json({ error: e.message }, 500); }
+      });
+    });
+    metaReq.on('error', err => json({ error: err.message }, 500));
+    metaReq.write(metaBody);
+    metaReq.end();
 
     return; // async
   }
