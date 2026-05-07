@@ -393,14 +393,15 @@ function saveMetaConfig() {
 async function validateMetaConfig() {
   const pixelId = document.getElementById('meta-pixel-id').value.trim() || metaConfig.pixelId;
   const token = document.getElementById('meta-access-token').value.trim() || metaConfig.token;
+  const testCode = document.getElementById('meta-test-code').value.trim() || metaConfig.testCode || '';
   if (!pixelId || !token) { toast('Ingresá Pixel ID y Token primero', 'error'); return; }
-  toast('Validando credenciales...', 'info');
+  toast('Enviando evento de prueba a Meta...', 'info');
   try {
-    const res = await api('/api/meta/validate', 'POST', { pixelId, accessToken: token });
+    const res = await api('/api/meta/validate', 'POST', { pixelId, accessToken: token, testCode });
     if (res.ok) {
-      toast(`✓ Token válido (${res.tokenOwner}) · Pixel: ${res.pixelName || res.pixelId}`, 'success');
+      toast(`✓ Conexión con Meta CAPI exitosa — Pixel ${pixelId.slice(0,8)}... activo`, 'success');
     } else {
-      toast(`✗ Error en ${res.step}: ${res.error}`, 'error');
+      toast(`✗ Error: ${res.error}`, 'error');
       console.error('Meta validation:', res);
     }
   } catch(e) { toast('Error de conexión', 'error'); }
