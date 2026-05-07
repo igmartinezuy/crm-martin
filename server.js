@@ -235,48 +235,56 @@ function handleRoute(res, url, method, body) {
     return;
   }
 
-  // POST /api/meta/validate — validate Meta credentials
+  // POST /api/meta/validate — validate by sending a test event to Meta CAPI
   if (method === 'POST' && url.pathname === '/api/meta/validate') {
     var pixelId = body.pixelId;
     var accessToken = body.accessToken;
+    var testCode = body.testCode || '';
 
     if (!pixelId || !accessToken) {
       return jsonRes(res, { error: 'Faltan pixelId o accessToken' }, 400);
     }
 
-    // Test 1: validate token
-    var tokenPath = '/v19.0/me?access_token=' + accessToken;
-    var tokenReq = https.request({ hostname: 'graph.facebook.com', path: tokenPath, method: 'GET' }, function(r) {
+    // Send a real test event to Meta CAPI — this is the only reliable way to validate
+    var testEmail = sha256('test-validation@crm-martin.com');
+    var validatePayloadObj = {
+      data: [{
+        event_name: 'Lead',
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: 'crm',
+        user_data: { em: [testEmail] },
+        custom_data: { validation: true }
+      }]
+    };
+    if (testCode) validatePayloadObj.test_event_code = testCode;
+    var validatePayload = JSON.stringify(validatePayloadObj);
+
+    var metaPath = '/v19.0/' + pixelId + '/events?access_token=' + accessToken;
+    var options = {
+      hostname: 'graph.facebook.com',
+      path: metaPath,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(validatePayload) }
+    };
+
+    var valReq = https.request(options, function(valRes) {
       var d = '';
-      r.on('data', function(c) { d += c; });
-      r.on('end', function() {
+      valRes.on('data', function(c) { d += c; });
+      valRes.on('end', function() {
         try {
-          var tokenData = JSON.parse(d);
-          if (tokenData.error) {
-            return jsonRes(res, { ok: false, step: 'token', error: tokenData.error.message, code: tokenData.error.code });
+          var parsed = JSON.parse(d);
+          if (parsed.events_received > 0 || parsed.fbtrace_id) {
+            jsonRes(res, { ok: true, events_received: parsed.events_received, pixelId: pixelId });
+          } else {
+            var errMsg = (parsed.error && parsed.error.message) || 'Error desconocido';
+            jsonRes(res, { ok: false, step: 'pixel', error: errMsg }, 400);
           }
-          // Token OK — test pixel access
-          var pixelPath = '/v19.0/' + pixelId + '?access_token=' + accessToken;
-          var pixelReq = https.request({ hostname: 'graph.facebook.com', path: pixelPath, method: 'GET' }, function(r2) {
-            var d2 = '';
-            r2.on('data', function(c) { d2 += c; });
-            r2.on('end', function() {
-              try {
-                var pixelData = JSON.parse(d2);
-                if (pixelData.error) {
-                  return jsonRes(res, { ok: false, step: 'pixel', error: pixelData.error.message, code: pixelData.error.code, tokenOwner: tokenData.name || tokenData.id });
-                }
-                return jsonRes(res, { ok: true, tokenOwner: tokenData.name || tokenData.id, pixelName: pixelData.name, pixelId: pixelData.id });
-              } catch(e) { jsonRes(res, { error: e.message }, 500); }
-            });
-          });
-          pixelReq.on('error', function(e) { jsonRes(res, { error: e.message }, 500); });
-          pixelReq.end();
         } catch(e) { jsonRes(res, { error: e.message }, 500); }
       });
     });
-    tokenReq.on('error', function(e) { jsonRes(res, { error: e.message }, 500); });
-    tokenReq.end();
+    valReq.on('error', function(e) { jsonRes(res, { error: e.message }, 500); });
+    valReq.write(validatePayload);
+    valReq.end();
     return;
   }
 
