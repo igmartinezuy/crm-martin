@@ -213,10 +213,14 @@
   <!-- META CONFIG -->
   <div class="meta-config">
     <div class="meta-config-label">🔵 Meta CAPI</div>
-    <input type="text" id="meta-pixel-id" placeholder="Pixel ID">
+    <input type="text" id="meta-pixel-id" placeholder="Pixel ID" style="max-width:150px">
     <input type="password" id="meta-access-token" placeholder="Access Token">
+    <input type="text" id="meta-test-code" placeholder="TEST12345 (opcional)" style="max-width:200px">
     <button class="btn btn-ghost" style="padding:8px 14px;font-size:11px" onclick="saveMetaConfig()">Guardar</button>
     <div class="meta-status" id="meta-status">⚠ Configura Pixel ID y Token</div>
+  </div>
+  <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:16px;padding:0 4px">
+    💡 <b style="color:var(--accent)">Modo prueba:</b> Pegá el código de Test Events de Meta. Los eventos llegan pero <b>no afectan el algoritmo</b>. Borralo para ir a producción.
   </div>
 
   <!-- SIMULATE BANNER -->
@@ -375,8 +379,9 @@ async function simulateCalendly() {
 function saveMetaConfig() {
   const pixelId = document.getElementById('meta-pixel-id').value.trim();
   const token = document.getElementById('meta-access-token').value.trim();
+  const testCode = document.getElementById('meta-test-code').value.trim();
   if (!pixelId || !token) { toast('Completá Pixel ID y Token', 'error'); return; }
-  metaConfig = { pixelId, token };
+  metaConfig = { pixelId, token, testCode };
   localStorage.setItem('crm_meta', JSON.stringify(metaConfig));
   document.getElementById('meta-access-token').value = '';
   document.getElementById('meta-access-token').placeholder = '••• guardado';
@@ -387,7 +392,8 @@ function saveMetaConfig() {
 function updateMetaStatus() {
   const el = document.getElementById('meta-status');
   if (metaConfig.pixelId && metaConfig.token) {
-    el.textContent = `✓ Pixel ${metaConfig.pixelId.slice(0,6)}... conectado`;
+    const testMode = metaConfig.testCode ? ' · 🧪 PRUEBA' : '';
+    el.textContent = `✓ Pixel ${metaConfig.pixelId.slice(0,6)}...${testMode}`;
     el.className = 'meta-status ok';
   } else {
     el.textContent = '⚠ Configura Pixel ID y Token';
@@ -404,7 +410,8 @@ async function sendMetaCAPI(contactId, eventName) {
     const res = await api('/api/meta/send', 'POST', {
       contactId, eventName,
       pixelId: metaConfig.pixelId,
-      accessToken: metaConfig.token
+      accessToken: metaConfig.token,
+      testCode: metaConfig.testCode || ''
     });
     if (res.ok) {
       const idx = contacts.findIndex(c => c.id === contactId);
