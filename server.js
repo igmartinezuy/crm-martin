@@ -7,6 +7,36 @@ const crypto = require('crypto');
 const PORT = process.env.PORT || 3000;
 const DB_PATH = path.join(__dirname, 'data', 'contacts.json');
 
+// ─── AUTH CONFIG ──────────────────────────────────────────
+var AUTH_USER = process.env.AUTH_USER || 'martin';
+var AUTH_PASS_HASH = process.env.AUTH_PASS_HASH || '3646f12368fa2f7d37bc6faea4464c1723c6a815550e9e3eaa5543ee4366bc2c';
+var SESSION_SECRET = process.env.SESSION_SECRET || '996eb6fe4e0c45cf5d977ef10471628a39e4789261240b1b1a431e6a42a8eb14';
+var SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+var sessions = {};
+
+function generateSessionId() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+function isValidSession(req) {
+  var cookie = req.headers.cookie || '';
+  var match = cookie.match(/session=([a-f0-9]+)/);
+  if (!match) return false;
+  var sessionId = match[1];
+  var session = sessions[sessionId];
+  if (!session) return false;
+  if (Date.now() > session.expires) {
+    delete sessions[sessionId];
+    return false;
+  }
+  return true;
+}
+
+function setSessionCookie(res, sessionId) {
+  var expires = new Date(Date.now() + SESSION_DURATION).toUTCString();
+  res.setHeader('Set-Cookie', 'session=' + sessionId + '; Path=/; HttpOnly; SameSite=Strict; Expires=' + expires);
+}
+
 function readDB() {
   try {
     if (!fs.existsSync(DB_PATH)) fs.writeFileSync(DB_PATH, JSON.stringify([]));
@@ -41,18 +71,86 @@ const server = http.createServer(function(req, res) {
 
   if (method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+  // ── Login page (public) ──
+  if (method === 'GET' && url.pathname === '/login') {
+    var loginHtml = fs.readFileSync(path.join(__dirname, 'public', 'login.html'));
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(loginHtml);
+    return;
+  }
+
+  // ── POST /api/auth/login ──
+  if (method === 'POST' && url.pathname === '/api/auth/login') {
+    var username = body.username || '';
+    var password = body.password || '';
+    var passHash = crypto.createHash('sha256').update(password).digest('hex');
+    if (username === AUTH_USER && passHash === AUTH_PASS_HASH) {
+      var sessionId = generateSessionId();
+      sessions[sessionId] = { user: username, expires: Date.now() + SESSION_DURATION };
+      setSessionCookie(res, sessionId);
+      return jsonRes(res, { ok: true });
+    } else {
+      return jsonRes(res, { ok: false, error: 'Usuario o contraseña incorrectos' }, 401);
+    }
+  }
+
+  // ── POST /api/auth/logout ──
+  if (method === 'POST' && url.pathname === '/api/auth/logout') {
+    var cookie = req.headers.cookie || '';
+    var match = cookie.match(/session=([a-f0-9]+)/);
+    if (match) delete sessions[match[1]];
+    res.setHeader('Set-Cookie', 'session=; Path=/; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    return jsonRes(res, { ok: true });
+  }
+
+  // ── GET /api/auth/check ──
+  if (method === 'GET' && url.pathname === '/api/auth/check') {
+    return jsonRes(res, { ok: isValidSession(req) });
+  }
+
+  // ── Static files (protected) ──
   if (method === 'GET' && !url.pathname.startsWith('/api')) {
+    // Allow robots.txt without auth
+    if (url.pathname === '/robots.txt') {
+      var robotsPath = path.join(__dirname, 'public', 'robots.txt');
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end(fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath) : 'User-agent: *\nAllow: /');
+      return;
+    }
+
+    // Redirect to login if not authenticated
+    if (!isValidSession(req)) {
+      res.writeHead(302, { 'Location': '/login' });
+      res.end();
+      return;
+    }
+
     var filePath = url.pathname === '/' ? '/index.html' : url.pathname;
     filePath = path.join(__dirname, 'public', filePath);
     var ext = path.extname(filePath);
-    var mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript' };
+    var mime = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.txt': 'text/plain' };
     if (fs.existsSync(filePath)) {
-      res.writeHead(200, { 'Content-Type': mime[ext] || 'text/plain' });
+      res.writeHead(200, {
+        'Content-Type': mime[ext] || 'text/plain',
+        'X-Robots-Tag': 'all',
+        'Access-Control-Allow-Origin': '*'
+      });
       res.end(fs.readFileSync(filePath));
     } else {
       res.writeHead(404); res.end('Not found');
     }
     return;
+  }
+
+  // ── Protect all API routes ──
+  if (url.pathname.startsWith('/api') && 
+      url.pathname !== '/api/auth/login' && 
+      url.pathname !== '/api/auth/logout' &&
+      url.pathname !== '/api/auth/check' &&
+      url.pathname !== '/api/webhook/calendly') {
+    if (!isValidSession(req)) {
+      return jsonRes(res, { error: 'No autorizado' }, 401);
+    }
   }
 
   var body = '';

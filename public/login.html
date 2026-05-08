@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM — Acceso</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0a0a0a;
+    color: #f0f0f0;
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .login-box {
+    background: #111111;
+    border: 1px solid #222222;
+    border-radius: 16px;
+    padding: 48px 40px;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .logo {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #c8f135;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 40px;
+  }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #f0f0f0;
+    margin-bottom: 32px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 8px;
+  }
+
+  input {
+    width: 100%;
+    background: #0a0a0a;
+    border: 1px solid #222;
+    border-radius: 8px;
+    color: #f0f0f0;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus { border-color: #c8f135; }
+
+  .btn {
+    width: 100%;
+    background: #c8f135;
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 14px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { background: #d8ff45; transform: translateY(-1px); }
+  .btn:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+
+  .error {
+    background: rgba(255,69,69,0.12);
+    border: 1px solid rgba(255,69,69,0.3);
+    border-radius: 8px;
+    color: #ff4545;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    display: none;
+  }
+
+  .footer {
+    text-align: center;
+    margin-top: 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: #444;
+  }
+</style>
+</head>
+<body>
+
+<div class="login-box">
+  <div class="logo">CRM</div>
+  <div class="subtitle">Panel de gestión de leads</div>
+  <h1>Iniciar sesión</h1>
+
+  <div class="form-group">
+    <label>Usuario</label>
+    <input type="text" id="username" placeholder="tu usuario" autocomplete="username">
+  </div>
+
+  <div class="form-group">
+    <label>Contraseña</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+
+  <button class="btn" id="btn-login" onclick="login()">Entrar</button>
+
+  <div class="error" id="error-msg">Usuario o contraseña incorrectos</div>
+
+  <div class="footer">Acceso restringido — solo usuarios autorizados</div>
+</div>
+
+<script>
+  // Submit on Enter
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') login();
+  });
+
+  async function login() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('btn-login');
+    const errorEl = document.getElementById('error-msg');
+
+    if (!username || !password) {
+      errorEl.textContent = 'Completá usuario y contraseña';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+    errorEl.style.display = 'none';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+
+      if (data.ok) {
+        window.location.href = '/';
+      } else {
+        errorEl.textContent = data.error || 'Usuario o contraseña incorrectos';
+        errorEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      }
+    } catch (e) {
+      errorEl.textContent = 'Error de conexión. Intentá de nuevo.';
+      errorEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Entrar';
+    }
+  }
+</script>
+</body>
+</html>

@@ -201,6 +201,7 @@
 
 <div class="topbar">
   <div class="logo">CRM <span>/ Martín Vieira Taroco</span></div>
+  <button onclick="logout()" style="background:transparent;border:1px solid #333;border-radius:6px;color:#666;font-family:'DM Mono',monospace;font-size:11px;padding:6px 12px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='#ff4545';this.style.color='#ff4545'" onmouseout="this.style.borderColor='#333';this.style.color='#666'">Cerrar sesión</button>
   <div class="topbar-stats">
     <div>Agendados <b id="stat-total">—</b></div>
     <div>Asistieron <b id="stat-asistio">—</b></div>
@@ -661,6 +662,11 @@ function toast(msg, type = 'info') {
 }
 
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.add('hidden'); }));
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login';
+}
 
 init();
 </script>
