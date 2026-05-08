@@ -161,7 +161,7 @@ const server = http.createServer(function(req, res) {
   });
 });
 
-function handleRoute(res, url, method, body) {
+function handleRoute(req, res, url, method, body) {
 
   if (method === 'GET' && url.pathname === '/api/contacts') {
     return jsonRes(res, readDB());

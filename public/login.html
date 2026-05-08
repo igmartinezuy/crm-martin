@@ -134,7 +134,10 @@
 
   <div class="form-group">
     <label>Contraseña</label>
-    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    <div style="position:relative">
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" style="padding-right:44px">
+      <button onclick="togglePass()" type="button" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#666;font-size:16px;padding:4px" id="eye-btn">👁</button>
+    </div>
   </div>
 
   <button class="btn" id="btn-login" onclick="login()">Entrar</button>
@@ -149,6 +152,18 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') login();
   });
+
+  function togglePass() {
+    var input = document.getElementById('password');
+    var btn = document.getElementById('eye-btn');
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  }
 
   async function login() {
     const username = document.getElementById('username').value.trim();
