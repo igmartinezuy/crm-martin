@@ -120,6 +120,11 @@ const server = http.createServer(function(req, res) {
 
 function handleRoute(req, res, url, method, body) {
 
+  // ── GET /api/ping (public — keep server alive) ──
+  if (method === 'GET' && url.pathname === '/api/ping') {
+    return jsonRes(res, { ok: true, ts: Date.now() });
+  }
+
   // ── POST /api/auth/login ──
   if (method === 'POST' && url.pathname === '/api/auth/login') {
     var username = body.username || '';
