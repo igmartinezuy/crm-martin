@@ -174,6 +174,31 @@ function handleRoute(req, res, url, method, body) {
     return jsonRes(res, { ok: true, contact: contact });
   }
 
+  // ── POST /api/webhook/form (public — landing page form) ──
+  if (method === 'POST' && url.pathname === '/api/webhook/form') {
+    var contact = {
+      id: uid(),
+      createdAt: new Date().toISOString(),
+      metaSent: {},
+      source: 'landing-form',
+      nombre: body.nombre || '',
+      apellido: body.apellido || '',
+      email: body.email || '',
+      telefono: body.telefono || '',
+      negocio: body.negocio || '',
+      fecha: new Date().toISOString(),
+      estado: 'agendado',
+      notas: body.obstaculo ? 'Obstáculo: ' + body.obstaculo : ''
+    };
+    var contacts = readDB();
+    var exists = contacts.find(function(c) { return c.email === contact.email; });
+    if (exists) return jsonRes(res, { ok: true, duplicate: true });
+    contacts.unshift(contact);
+    writeDB(contacts);
+    console.log('[Form Landing] Nuevo lead: ' + contact.nombre + ' ' + contact.apellido + ' <' + contact.email + '>');
+    return jsonRes(res, { ok: true, contact: contact });
+  }
+
   // ── Protect all other API routes ──
   if (!isValidSession(req)) {
     return jsonRes(res, { error: 'No autorizado' }, 401);
